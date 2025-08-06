@@ -3,11 +3,25 @@ import app from './express'
 import mongoose from 'mongoose'
 
 // Connection URL
-mongoose.Promise = global.Promise
-mongoose.connect(config.mongoUri, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true })
-mongoose.connection.on('error', () => {
-  throw new Error(`unable to connect to database: ${config.mongoUri}`)
-})
+console.log('Connecting to MongoDB at:', config.mongoUri);
+mongoose.Promise = global.Promise;
+
+mongoose.connect(config.mongoUri, { 
+  useNewUrlParser: true, 
+  useCreateIndex: true, 
+  useUnifiedTopology: true,
+  useFindAndModify: false
+}).then(() => {
+  console.log('Successfully connected to MongoDB');
+}).catch(err => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
+});
 
 app.listen(config.port, (err) => {
   if (err) {

@@ -1,3 +1,12 @@
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+const result = dotenv.config();
+
+if (result.error) {
+  console.error('Error loading .env file:', result.error);
+}
+
 const config = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 3000,
@@ -9,4 +18,6 @@ const config = {
     '/mernproject'
 }
 
-export default config
+console.log('MongoDB URI:', config.mongoUri);
+
+export default config;

@@ -10,6 +10,22 @@ const ExpenseSchema = new mongoose.Schema({
     trim: true,
     required: 'Category is required'
   },
+  aiCategory: {
+    suggested: {
+      type: String,
+      trim: true
+    },
+    confidence: {
+      type: Number,
+      min: 0,
+      max: 1,
+      default: 0
+    },
+    isAutoApplied: {
+      type: Boolean,
+      default: false
+    }
+  },
   amount: {
       type: Number,
       min: 0,

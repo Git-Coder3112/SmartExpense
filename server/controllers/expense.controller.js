@@ -2,14 +2,43 @@ import Expense from '../models/expense.model'
 import extend from 'lodash/extend'
 import errorHandler from './../helpers/dbErrorHandler'
 import mongoose from 'mongoose'
+import expenseCategorizer from '../ai/services/expenseCategorizer'
 
 const create = async (req, res) => {
   try {
     req.body.recorded_by = req.auth._id
-    const expense = new Expense(req.body)
+    
+    // Get AI category suggestion
+    const aiSuggestion = await expenseCategorizer.categorize(
+      req.body.title,
+      req.body.amount
+    );
+    
+    // Add AI category to the expense
+    const expenseData = {
+      ...req.body,
+      aiCategory: {
+        suggested: aiSuggestion.category,
+        confidence: aiSuggestion.confidence,
+        isAutoApplied: false
+      }
+    };
+    
+    // Auto-apply category if confidence is high enough
+    if (aiSuggestion.confidence > 0.7) {
+      expenseData.category = aiSuggestion.category;
+      expenseData.aiCategory.isAutoApplied = true;
+    }
+    
+    const expense = new Expense(expenseData);
     await expense.save()
+    
     return res.status(200).json({
-      message: "Expense recorded!"
+      message: "Expense recorded!",
+      data: {
+        ...expense._doc,
+        aiSuggestedCategory: expense.aiCategory
+      }
     })
   } catch (err) {
     return res.status(400).json({

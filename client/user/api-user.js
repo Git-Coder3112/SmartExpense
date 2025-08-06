@@ -1,20 +1,28 @@
 const create = async (user) => {
+  console.log('Sending signup request with user:', user);
   try {
       let response = await fetch('/api/users/', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache': 'no-cache'
         },
+        credentials: 'same-origin',
         body: JSON.stringify(user)
       })
-    return await response.json()
+      console.log('Received response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+      return data;
   } catch(err) {
-    console.log(err)
+      console.error('Error in create user:', err);
+      return { error: 'Failed to connect to server' };
   }
 }
 
 const list = async (signal) => {
+  console.log('Sending list request');
   try {
     let response = await fetch('/api/users/', {
       method: 'GET',

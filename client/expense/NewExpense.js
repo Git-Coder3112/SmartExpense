@@ -1,4 +1,4 @@
-import React, {useState} from 'react'
+import React, {useState, useEffect} from 'react'
 import Card from '@material-ui/core/Card'
 import CardActions from '@material-ui/core/CardActions'
 import CardContent from '@material-ui/core/CardContent'
@@ -12,6 +12,9 @@ import {create} from './api-expense.js'
 import {Link, Redirect} from 'react-router-dom'
 import DateFnsUtils from '@date-io/date-fns'
 import { DateTimePicker, MuiPickersUtilsProvider} from "@material-ui/pickers"
+import Chip from '@material-ui/core/Chip'
+import Tooltip from '@material-ui/core/Tooltip'
+import CircularProgress from '@material-ui/core/CircularProgress'
 
 const useStyles = makeStyles(theme => ({
   card: {
@@ -55,15 +58,80 @@ export default function NewExpense() {
       amount: '',
       incurred_on: new Date(),
       notes: '',
+      redirect: false,
       error: ''
+  })
+  const [aiSuggestions, setAiSuggestions] = useState({
+    loading: false,
+    suggestedCategory: null,
+    confidence: 0
   })
   const jwt = auth.isAuthenticated()
   
+  // Get AI category suggestion when title changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (values.title && values.title.length > 3 && !values.category) {
+        getAiSuggestion(values.title, values.amount);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [values.title, values.amount]);
+
+  // Get AI category suggestion
+  const getAiSuggestion = async (title, amount) => {
+    if (!title || title.length < 3) return;
+    
+    setAiSuggestions({...aiSuggestions, loading: true});
+    
+    try {
+      const response = await fetch('/api/expenses/ai/categorize', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + auth.isAuthenticated().token
+        },
+        body: JSON.stringify({ title, amount })
+      });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      if (data.category) {
+        setAiSuggestions({
+          loading: false,
+          suggestedCategory: data.category,
+          confidence: data.confidence || 0
+        });
+        
+        // Auto-apply if confidence is high
+        if (data.confidence > 0.7) {
+          setValues({...values, category: data.category});
+        }
+      }
+    } catch (error) {
+      console.error('Error getting AI suggestion:', error);
+      setAiSuggestions({
+        ...aiSuggestions,
+        loading: false,
+        error: 'Could not get AI suggestion'
+      });
+    }
+  };
+
   const handleChange = name => event => {
-    setValues({...values, [name]: event.target.value })
+    const value = name === 'photo'
+      ? event.target.files[0]
+      : event.target.value
+    setValues({...values, [name]: value })
   }
-  const handleDateChange = date => {
-    setValues({...values, incurred_on: date })
+  
+  const handleDateChange = (date) => {
+    setValues({...values, incurred_on: date });
   }
 
   const clickSubmit = () => {
@@ -98,7 +166,48 @@ export default function NewExpense() {
           <TextField id="title" label="Title" className={classes.textField} value={values.title} onChange={handleChange('title')} margin="normal"/><br/>
           <TextField id="amount" label="Amount ($)" className={classes.textField} value={values.amount} onChange={handleChange('amount')} margin="normal" type="number"/><br/>
           
-          <TextField id="category" label="Category" className={classes.textField} value={values.category} onChange={handleChange('category')} margin="normal"/><br/>
+          <TextField 
+            id="category" 
+            type="category" 
+            label="Category" 
+            className={classes.textField} 
+            value={values.category} 
+            onChange={handleChange('category')} 
+            margin="normal"
+            helperText="Start typing the expense title to get AI suggestions"
+          />
+          
+          {aiSuggestions.loading && (
+            <div style={{margin: '10px 0'}}>
+              <CircularProgress size={20} style={{marginRight: 10}} />
+              <span>Analyzing expense...</span>
+            </div>
+          )}
+          
+          {!aiSuggestions.loading && aiSuggestions.suggestedCategory && (
+            <div style={{margin: '10px 0'}}>
+              <Typography variant="caption" color="textSecondary">
+                AI Suggestion: 
+                <Tooltip title={`Confidence: ${Math.round(aiSuggestions.confidence * 100)}%`}>
+                  <Chip 
+                    label={aiSuggestions.suggestedCategory}
+                    onClick={() => setValues({...values, category: aiSuggestions.suggestedCategory})}
+                    color={values.category === aiSuggestions.suggestedCategory ? 'primary' : 'default'}
+                    variant={values.category === aiSuggestions.suggestedCategory ? 'default' : 'outlined'}
+                    size="small"
+                    style={{marginLeft: 8, cursor: 'pointer'}}
+                  />
+                </Tooltip>
+                {aiSuggestions.confidence > 0.7 && (
+                  <span style={{marginLeft: 8, color: '#4caf50'}}>
+                    <Icon style={{fontSize: 16, verticalAlign: 'middle'}}>check_circle</Icon>
+                    <span style={{verticalAlign: 'middle'}}>High confidence</span>
+                  </span>
+                )}
+              </Typography>
+            </div>
+          )}
+          <br/>
           <br/>
           <MuiPickersUtilsProvider utils={DateFnsUtils}>
                 <DateTimePicker

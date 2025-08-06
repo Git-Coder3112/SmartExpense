@@ -1,6 +1,7 @@
 import express from 'express'
 import expenseCtrl from '../controllers/expense.controller'
 import authCtrl from '../controllers/auth.controller'
+import expenseCategorizer from '../ai/services/expenseCategorizer'
 
 const router = express.Router()
 
@@ -18,6 +19,28 @@ router.route('/api/expenses/category/averages')
 
 router.route('/api/expenses/yearly')
   .get(authCtrl.requireSignin, expenseCtrl.yearlyExpenses)
+
+// AI Categorization endpoint
+router.route('/api/expenses/ai/categorize')
+  .post(authCtrl.requireSignin, async (req, res) => {
+    try {
+      const { title, amount } = req.body;
+      
+      if (!title) {
+        return res.status(400).json({
+          error: 'Title is required for categorization'
+        });
+      }
+      
+      const result = await expenseCategorizer.categorize(title, amount);
+      res.json(result);
+    } catch (error) {
+      console.error('Error in AI categorization:', error);
+      res.status(500).json({
+        error: 'Failed to categorize expense'
+      });
+    }
+  });
 
 router.route('/api/expenses')
   .post(authCtrl.requireSignin, expenseCtrl.create)
